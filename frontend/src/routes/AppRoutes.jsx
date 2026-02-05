@@ -2,6 +2,7 @@ import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import MainLayout from '../layouts/MainLayout';
 import DashboardPage from '../pages/DashboardPage';
+import SynopticsPage from '../pages/SynopticsPage';
 import TrendsPage from '../pages/TrendsPage';
 import AdminAlarmsPage from '../pages/AdminAlarmsPage';
 import AlarmHistoryPage from '../pages/AlarmHistoryPage';
@@ -12,6 +13,7 @@ const AppRoutes = () => {
             <Route element={<MainLayout />}>
                 <Route path="/" element={<Navigate to="/dashboard" replace />} />
                 <Route path="/dashboard" element={<DashboardPage />} />
+                <Route path="/synoptics" element={<SynopticsPage />} />
                 <Route path="/trends" element={<TrendsPage />} />
                 <Route path="/admin/alarms" element={<AdminAlarmsPage />} />
                 <Route path="/admin/alarm-history" element={<AlarmHistoryPage />} />
