@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Cpu, LayoutDashboard, LineChart, Settings, Bell, History } from 'lucide-react';
+import { Cpu, LayoutDashboard, LineChart, Settings, Bell, History, Factory } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { useSCADA } from '../contexts/SCADAContext';
 import { useAlarms } from '../contexts/AlarmContext';
@@ -36,6 +36,13 @@ const Header = () => {
                             fontSize: '0.9rem', fontWeight: '500', transition: 'all 0.2s'
                         }}>
                             <LayoutDashboard size={18} /> Dashboard
+                        </Link>
+                        <Link to="/synoptics" style={{
+                            display: 'flex', alignItems: 'center', gap: '0.5rem',
+                            textDecoration: 'none', color: isActive('/synoptics') ? 'var(--accent-cyan)' : 'var(--text-secondary)',
+                            fontSize: '0.9rem', fontWeight: '500', transition: 'all 0.2s'
+                        }}>
+                            <Factory size={18} /> Sinóptico
                         </Link>
                         <Link to="/trends" style={{
                             display: 'flex', alignItems: 'center', gap: '0.5rem',
