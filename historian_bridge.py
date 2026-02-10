@@ -220,7 +220,9 @@ def check_alarms(tag_id, value, ts):
                     
                     # --- NOTIFICACIÓN TWILIO ---
                     txt = f"🚨 ALARMA: {msg}\nTag: {tag_id}\nValor: {value} (Umbral {op} {threshold})"
-                    send_notification(txt)
+
+                    #para enviar notificaciones descomentar esta linea
+                    # send_notification(txt)
                     # --------------------------
 
                     r.publish("live_updates", json.dumps({
