@@ -1,0 +1,132 @@
+version: '3.8'
+
+services:
+  # El Broker MQTT
+  emqx:
+    image: emqx/emqx:5.3.0
+    container_name: scada_broker
+    ports:
+      - "1883:1883"
+      - "8083:8083"
+      - "18083:18083"
+    environment:
+      - EMQX_DASHBOARD__BOOTSTRAP_PASSWORD=public
+    networks:
+      - scada_net
+
+  # Base de Datos de Series Temporales (TimescaleDB)
+  timescaledb:
+    image: timescale/timescaledb:latest-pg15
+    container_name: scada_historian
+    volumes:
+      - scada_db_data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_PASSWORD=scada_admin
+      - POSTGRES_USER=scada_user
+      - POSTGRES_DB=scada_db
+    ports:
+      - "5432:5432"
+    networks:
+      - scada_net
+
+  # Redis - Motor de Tags en Tiempo Real
+  redis:
+    image: redis:alpine
+    container_name: scada_tag_engine
+    ports:
+      - "6379:6379"
+    networks:
+      - scada_net
+
+  # Backend API
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: scada_backend
+    ports:
+      - "8000:8000"
+    environment:
+      - REDIS_HOST=redis
+      - DB_HOST=timescaledb
+    depends_on:
+      - redis
+      - timescaledb
+    volumes:
+      - .:/app
+    networks:
+      - scada_net
+
+  # Frontend Dashboard (Modo Desarrollo con Auto-Reload)
+  frontend:
+    image: node:22-alpine
+    container_name: scada_frontend
+    working_dir: /app
+    volumes:
+      - ./frontend:/app
+    ports:
+      - "5173:5173"
+    command: sh -c "if [ ! -d node_modules ]; then npm install; fi && npm run dev -- --host"
+    depends_on:
+      - backend
+    networks:
+      - scada_net
+
+  # Historian Bridge (Worker)
+  bridge:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: scada_bridge
+    command: python -u historian_bridge.py
+    environment:
+      - MQTT_BROKER=emqx
+      - REDIS_HOST=redis
+      - DB_HOST=timescaledb
+      - TWILIO_ACCOUNT_SID=${TWILIO_ACCOUNT_SID}
+      - TWILIO_AUTH_TOKEN=${TWILIO_AUTH_TOKEN}
+      - TWILIO_FROM_NUMBER=${TWILIO_FROM_NUMBER}
+      - TWILIO_TO_NUMBER=${TWILIO_TO_NUMBER}
+    depends_on:
+      - emqx
+      - redis
+      - timescaledb
+    volumes:
+      - .:/app
+    networks:
+      - scada_net
+
+  # Watchdog - Monitoreo de Salud de Datos
+  watchdog:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: scada_watchdog
+    command: python -u watchdog_service.py
+    environment:
+      - REDIS_HOST=redis
+    depends_on:
+      - redis
+    networks:
+      - scada_net
+
+  # Simulador de Planta - Generador de Datos Dummy
+  simulator:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: scada_simulator
+    command: python -u planta_sim.py
+    environment:
+      - MQTT_BROKER=emqx
+    depends_on:
+      - emqx
+    networks:
+      - scada_net
+
+networks:
+  scada_net:
+    driver: bridge
+
+volumes:
+  scada_db_data:
