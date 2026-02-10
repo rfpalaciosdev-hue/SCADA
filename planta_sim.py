@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 
 TAGS = [
     {"path": "planta_central/cocimiento/tanque_01/nivel", "unit": "%", "range": (70, 85)},
-    {"path": "planta_central/cocimiento/tanque_01/temperatura", "unit": "°C", "range": (88, 92)},
+    {"path": "planta_central/cocimiento/tanque_01/temperatura", "unit": "°C", "range": (70, 95)},
     {"path": "planta_central/empaquetado/linea_01/motor_principal/corriente", "unit": "A", "range": (12, 15)},
     {"path": "planta_central/empaquetado/linea_01/motor_principal/estado", "unit": "binary", "range": (0, 1)},
     {"path": "planta_central/servicios/caldera/presion", "unit": "bar", "range": (6, 8)}
@@ -30,7 +30,15 @@ client.on_connect = on_connect
 
 try:
     print(f"🚀 Iniciando Simulación de Planta [ID: {client_id}] en {BROKER}:{PORT}...")
-    client.connect(BROKER, PORT, 60)
+    
+    while True:
+        try:
+            client.connect(BROKER, PORT, 60)
+            break
+        except Exception as e:
+            print(f"❌ Falló conexión al broker ({e}). Reintentando en 5s...")
+            time.sleep(5)
+
     client.loop_start()
 
     while True:

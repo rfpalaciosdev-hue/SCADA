@@ -4,3 +4,4 @@ redis
 psycopg2-binary
 websockets
 paho-mqtt
+twilio
