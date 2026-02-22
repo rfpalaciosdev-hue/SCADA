@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simulación Planta - Panel de Control</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"
+        type="text/javascript"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f0f2f5;
+            color: #333;
+            margin: 0;
+            padding: 20px;
+        }
+
+        h1 {
+            text-align: center;
+            color: #2c3e50;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            transition: transform 0.2s;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+        }
+
+        .card h3 {
+            margin-top: 0;
+            font-size: 1.1em;
+            color: #34495e;
+            border-bottom: 2px solid #ecf0f1;
+            padding-bottom: 10px;
+            min-height: 50px;
+        }
+
+        .value-display {
+            font-size: 2em;
+            text-align: center;
+            margin: 15px 0;
+            color: #2980b9;
+            font-weight: bold;
+        }
+
+        .unit {
+            font-size: 0.5em;
+            color: #7f8c8d;
+        }
+
+        .controls {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid #ecf0f1;
+        }
+
+        .mode-selector {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .btn {
+            padding: 5px 10px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.9em;
+            transition: background 0.2s;
+        }
+
+        .btn-auto {
+            background: #e0e0e0;
+        }
+
+        .btn-manual {
+            background: #e0e0e0;
+        }
+
+        .btn-off {
+            background: #e0e0e0;
+        }
+
+        .active-auto {
+            background: #2ecc71;
+            color: white;
+        }
+
+        .active-manual {
+            background: #f39c12;
+            color: white;
+        }
+
+        .active-off {
+            background: #e74c3c;
+            color: white;
+        }
+
+        .manual-input {
+            display: flex;
+            gap: 5px;
+            display: none;
+            /* Hidden by default */
+        }
+
+        .manual-input input {
+            flex: 1;
+            padding: 5px;
+            border: 1px solid #bdc3c7;
+            border-radius: 4px;
+        }
+
+        .btn-set {
+            background: #3498db;
+            color: white;
+        }
+
+        .status-indicator {
+            text-align: center;
+            font-size: 0.8em;
+            color: #7f8c8d;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <h1>🏭 Panel de Control de Simulación</h1>
+
+    <div id="connection-status" style="text-align: center; margin-bottom: 20px; color: orange;">Conectando al Broker...
+    </div>
+
+    <div class="container" id="cards-container">
+        <!-- Cards will be injected here -->
+    </div>
+
+    <script>
+        // Configuration
+        const BROKER_HOST = "localhost";
+        const BROKER_PORT = 8083; // Websocket port
+        const CLIENT_ID = "web_control_" + new Date().getTime();
+
+        // Local state to track modes
+        const tagState = {};
+
+        // MQTT Client - Including path /mqtt which is standard for EMQX
+        const client = new Paho.MQTT.Client(BROKER_HOST, BROKER_PORT, "/mqtt", CLIENT_ID);
+
+        client.onConnectionLost = onConnectionLost;
+        client.onMessageArrived = onMessageArrived;
+
+        client.connect({
+            onSuccess: onConnect,
+            onFailure: onFailure,
+            keepAliveInterval: 30
+        });
+
+        function onConnect() {
+            document.getElementById("connection-status").innerText = "✅ Conectado al Sistema";
+            document.getElementById("connection-status").style.color = "green";
+            console.log("Connected");
+
+            // Wildcard subscribe to get all simulation data
+            client.subscribe("planta_central/#");
+        }
+
+        function onFailure(responseObject) {
+            document.getElementById("connection-status").innerText = "❌ Fallo de Conexión: " + responseObject.errorMessage;
+            document.getElementById("connection-status").style.color = "red";
+            console.log("Connection failed: " + responseObject.errorMessage);
+        }
+
+        function onConnectionLost(responseObject) {
+            if (responseObject.errorCode !== 0) {
+                document.getElementById("connection-status").innerText = "⚠️ Conexión Perdida: " + responseObject.errorMessage;
+                document.getElementById("connection-status").style.color = "orange";
+                console.log("Connection lost: " + responseObject.errorMessage);
+            }
+        }
+
+        function onMessageArrived(message) {
+            const topic = message.destinationName;
+            let payload;
+            try {
+                payload = JSON.parse(message.payloadString);
+            } catch (e) {
+                console.error("Invalid JSON", e);
+                return;
+            }
+
+            // Update UI
+            updateCard(topic, payload);
+        }
+
+        function getCardId(topic) {
+            return "card-" + topic.replace(/\//g, "-");
+        }
+
+        function updateCard(topic, data) {
+            const cardId = getCardId(topic);
+            let card = document.getElementById(cardId);
+
+            if (!card) {
+                createCard(topic, data);
+                card = document.getElementById(cardId);
+            }
+
+            // Update Value
+            const valueEl = card.querySelector(".value-display");
+            valueEl.innerHTML = `${data.v} <span class="unit">${data.u}</span>`;
+
+            // Update Mode Visuals if provided in payload
+            if (data.mode) {
+                updateModeUI(cardId, data.mode);
+            }
+        }
+
+        function createCard(topic, data) {
+            const container = document.getElementById("cards-container");
+            const cardId = getCardId(topic);
+            const shortName = topic.split("/").pop().toUpperCase().replace(/_/g, " ");
+            const parentName = topic.split("/").slice(-2, -1)[0].toUpperCase().replace(/_/g, " ");
+
+            // Default ranges (will be updated by backend)
+            let minRange = 0;
+            let maxRange = 100;
+            if (data.range) {
+                minRange = data.range[0];
+                maxRange = data.range[1];
+            }
+
+            const card = document.createElement("div");
+            card.className = "card";
+            card.id = cardId;
+            card.innerHTML = `
+                <h3>${parentName}<br><small style="font-size:0.6em; color:#7f8c8d">${shortName}</small></h3>
+                <div class="value-display">-- <span class="unit">${data.u}</span></div>
+                
+                <div class="slider-container" style="margin: 20px 0;">
+                    <input type="range" class="value-slider" min="${minRange}" max="${maxRange}" step="0.1" style="width: 100%;" disabled>
+                </div>
+
+                <div class="controls">
+                    <div class="mode-selector">
+                        <button class="btn btn-auto active-auto" onclick="setMode('${topic}', 'AUTO')">AUTO</button>
+                        <button class="btn btn-manual" onclick="setMode('${topic}', 'MANUAL')">MAN</button>
+                        <button class="btn btn-off" onclick="setMode('${topic}', 'OFF')">OFF</button>
+                    </div>
+                    
+                    <div class="range-inputs" style="display:flex; gap:5px; margin-top:5px; align-items:center; justify-content:center;">
+                         <label style="font-size:0.8em">Min:</label>
+                         <input type="number" class="range-min" value="${minRange}" style="width: 50px;" onchange="updateRange('${topic}')">
+                         <label style="font-size:0.8em">Max:</label>
+                         <input type="number" class="range-max" value="${maxRange}" style="width: 50px;" onchange="updateRange('${topic}')">
+                    </div>
+
+                    <div class="manual-input">
+                        <!-- Manual input is now also controlled by slider, but keep precise input -->
+                        <input type="number" step="0.1" placeholder="Valor" class="manual-value-input">
+                        <button class="btn btn-set" onclick="setManualValue('${topic}')">SET</button>
+                    </div>
+                    <div class="status-indicator">Modo: AUTO</div>
+                </div>
+            `;
+            container.appendChild(card);
+
+            // Add event listener for slider directly to avoid inline JS complexity with 'this'
+            const slider = card.querySelector(".value-slider");
+            slider.addEventListener("input", function () {
+                // Only send update if in manual mode
+                const state = tagState[topic] || {};
+                if (state.mode === "MANUAL") {
+                    const val = this.value;
+                    // Update display immediately
+                    card.querySelector(".value-display").innerHTML = `${val} <span class="unit">${data.u}</span>`;
+                    // Send to backend (debouncing would be good but simple for now)
+                    sendControlMessage({ path: topic, value: val });
+                }
+            });
+
+            // Initialize state
+            tagState[topic] = { mode: "AUTO" };
+        }
+
+        function updateCard(topic, data) {
+            const cardId = getCardId(topic);
+            let card = document.getElementById(cardId);
+
+            if (!card) {
+                createCard(topic, data);
+                card = document.getElementById(cardId);
+            }
+
+            // Update Value Display
+            const valueEl = card.querySelector(".value-display");
+            valueEl.innerHTML = `${data.v} <span class="unit">${data.u}</span>`;
+
+            // Update Slider Value (if not dragging in manual mode? actually always update if auto, or if manual and external change)
+            // To prevent jitter while dragging in manual mode, we might want to check if the user is interacting.
+            // For now, let's update it.
+            const slider = card.querySelector(".value-slider");
+            const state = tagState[topic] || {};
+
+            // If Auto, always update slider to show value
+            if (state.mode !== "MANUAL") {
+                slider.value = data.v;
+            } else {
+                // If Manual, only update if the received value is significantly different (external change)
+                if (document.activeElement !== slider) {
+                    slider.value = data.v;
+                }
+            }
+
+            // Update Range Inputs/Slider MinMax if changed from backend
+            if (data.range) {
+                const minInput = card.querySelector(".range-min");
+                const maxInput = card.querySelector(".range-max");
+
+                // Initial sync or verify
+                if (document.activeElement !== minInput) minInput.value = data.range[0];
+                if (document.activeElement !== maxInput) maxInput.value = data.range[1];
+
+                slider.min = data.range[0];
+                slider.max = data.range[1];
+            }
+
+            // Update Mode Visuals if provided in payload
+            if (data.mode) {
+                // Cache mode
+                if (!tagState[topic]) tagState[topic] = {};
+                tagState[topic].mode = data.mode;
+
+                updateModeUI(cardId, data.mode);
+            }
+        }
+
+        function updateModeUI(cardId, mode) {
+            const card = document.getElementById(cardId);
+            if (!card) return;
+
+            // Update buttons
+            card.querySelectorAll(".mode-selector .btn").forEach(btn => {
+                btn.classList.remove("active-auto", "active-manual", "active-off");
+            });
+
+            const modeMap = {
+                "AUTO": "active-auto",
+                "MANUAL": "active-manual",
+                "OFF": "active-off"
+            };
+
+            const btnClass = modeMap[mode] || "active-auto";
+            const btnSelector = mode === "AUTO" ? ".btn-auto" : (mode === "MANUAL" ? ".btn-manual" : ".btn-off");
+            card.querySelector(btnSelector).classList.add(btnClass);
+
+            const manualInput = card.querySelector(".manual-input");
+            const slider = card.querySelector(".value-slider");
+            const rangeInputs = card.querySelector(".range-inputs");
+
+            if (mode === "MANUAL") {
+                manualInput.style.display = "flex";
+                slider.disabled = false;
+                // rangeInputs.style.opacity = "0.5"; // Dim range inputs in manual? No, maybe we want to constrain slider
+            } else {
+                manualInput.style.display = "none";
+                slider.disabled = true; // Read-only progress bar
+                // rangeInputs.style.opacity = "1";
+            }
+
+            // Update Status Text
+            card.querySelector(".status-indicator").innerText = "Modo: " + mode;
+        }
+
+        window.updateRange = function (topic) {
+            const cardId = getCardId(topic);
+            const card = document.getElementById(cardId);
+            const min = card.querySelector(".range-min").value;
+            const max = card.querySelector(".range-max").value;
+
+            console.log(`Setting range for ${topic}: ${min} - ${max}`);
+            sendControlMessage({
+                path: topic,
+                range_min: min,
+                range_max: max
+            });
+        };
+
+        // Global functions for onclick events
+        window.setMode = function (topic, mode) {
+            console.log(`Setting ${topic} to ${mode}`);
+            const payload = {
+                path: topic,
+                mode: mode
+            };
+            sendControlMessage(payload);
+            // Optimistic UI update
+            // updateModeUI(getCardId(topic), mode); // Wait for backend echo to keep state sync
+        };
+
+        window.setManualValue = function (topic) {
+            const cardId = getCardId(topic);
+            const card = document.getElementById(cardId);
+            const input = card.querySelector(".manual-value-input");
+            const val = input.value;
+
+            if (val === "") return;
+
+            console.log(`Setting ${topic} value to ${val}`);
+            const payload = {
+                path: topic,
+                value: val
+            };
+            sendControlMessage(payload);
+        };
+
+        function sendControlMessage(payload) {
+            const message = new Paho.MQTT.Message(JSON.stringify(payload));
+            message.destinationName = "sim/control";
+            client.send(message);
+        }
+
+    </script>
+    <div id="chat-container"
+        style="position:fixed; bottom:20px; right:20px; width:300px; background:white; border:1px solid #ccc; border-radius:10px; padding:10px;">
+        <div id="chat-box" style="height:200px; overflow-y:auto; margin-bottom:10px; font-size:12px;"></div>
+        <input type="text" id="chat-input" placeholder="Pregúntame algo..." style="width:70%;">
+        <button onclick="sendChat()">Enviar</button>
+    </div>
+
+    <script>
+        async function sendChat() {
+            const input = document.getElementById('chat-input');
+            const box = document.getElementById('chat-box');
+            const message = input.value;
+
+            if (!message.trim()) return;
+
+            box.innerHTML += `<div><b>Tú:</b> ${message}</div>`;
+            input.value = '';
+
+            try {
+                const response = await fetch('http://localhost:8000/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: message, history: [] }),
+                    timeout: 30000 // 30 second timeout
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+
+                if (data.answer) {
+                    box.innerHTML += `<div style="color:blue;"><b>Bot:</b> ${data.answer}</div>`;
+                } else if (data.detail) {
+                    box.innerHTML += `<div style="color:red;"><b>Error:</b> ${data.detail}</div>`;
+                } else {
+                    box.innerHTML += `<div style="color:red;"><b>Error:</b> Respuesta inesperada del servidor</div>`;
+                }
+            } catch (error) {
+                console.error('Chat error:', error);
+                let errorMsg = 'Error de conexión. ';
+
+                if (error.message.includes('Failed to fetch')) {
+                    errorMsg += 'No se puede conectar al backend. Verifica que esté corriendo en http://localhost:8000';
+                } else if (error.message.includes('timeout')) {
+                    errorMsg += 'La solicitud tardó demasiado. Intenta de nuevo.';
+                } else {
+                    errorMsg += error.message;
+                }
+
+                box.innerHTML += `<div style="color:red;"><b>Error:</b> ${errorMsg}</div>`;
+            }
+
+            box.scrollTop = box.scrollHeight;
+        }
+
+        // Allow Enter key to send message
+        document.getElementById('chat-input').addEventListener('keypress', function (e) {
+            if (e.key === 'Enter') {
+                sendChat();
+            }
+        });
+    </script>
+</body>
+
+</html>

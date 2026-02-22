@@ -8,6 +8,7 @@ from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
 from datetime import datetime, timedelta
 import os
+from chatbot_service import process_chat
 
 app = FastAPI(title="SCADA Real-Time API")
 
@@ -51,6 +52,18 @@ DB_CONFIG = {
 
 def get_db_connection():
     return psycopg2.connect(**DB_CONFIG)
+
+class ChatRequest(BaseModel):
+    message: str
+    history: Optional[List[Dict]] = []
+
+@app.post("/chat")
+def chat_endpoint(request: ChatRequest):
+    try:
+        answer = process_chat(request.message, request.history)
+        return {"answer": answer}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/history/{tag_path:path}/stats")
 async def get_tag_stats(tag_path: str, hours: float = 1.0, start: Optional[str] = None, end: Optional[str] = None):
