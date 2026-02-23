@@ -6,3 +6,4 @@ websockets
 paho-mqtt
 groq
 requests
+python-dotenv
