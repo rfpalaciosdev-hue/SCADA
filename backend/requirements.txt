@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+redis
+psycopg2-binary
+websockets
+paho-mqtt
+groq
+requests
+python-dotenv
