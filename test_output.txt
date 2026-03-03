@@ -1,0 +1,33 @@
+SUCCESS
+afs
+bin
+boot
+builddir
+dev
+etc
+home
+lib
+lib64
+lost+found
+media
+mnt
+opt
+proc
+root
+run
+sbin
+srv
+sys
+tmp
+usr
+var
+CONTAINER ID   IMAGE                               COMMAND                  CREATED         STATUS          PORTS                                                                                                                                                                                          NAMES
+615ce6ae9208   scada-backend                       "python backend_api.…"   2 minutes ago   Up 2 minutes    0.0.0.0:8000->8000/tcp, [::]:8000->8000/tcp                                                                                                                                                    scada_backend
+530c74686e28   scada-bridge                        "python historian_br…"   2 minutes ago   Up 2 minutes    8000/tcp                                                                                                                                                                                       scada_bridge
+5b19cbd2c97f   scada-watchdog                      "python watchdog_ser…"   2 minutes ago   Up 2 minutes    8000/tcp                                                                                                                                                                                       scada_watchdog
+63d22d193d67   entrenar_app-backend                "uvicorn app.main:ap…"   7 days ago      Up 3 hours      0.0.0.0:8001->8000/tcp, [::]:8001->8000/tcp                                                                                                                                                    entrenar_backend
+5a272a67d51d   postgres:15-alpine                  "docker-entrypoint.s…"   7 days ago      Up 3 hours      0.0.0.0:5433->5432/tcp, [::]:5433->5432/tcp                                                                                                                                                    entrenar_db
+b94b754b0508   node:22-alpine                      "docker-entrypoint.s…"   8 days ago      Up 16 minutes   0.0.0.0:5173->5173/tcp, [::]:5173->5173/tcp                                                                                                                                                    scada_frontend
+afe7f55d9f0b   redis:alpine                        "docker-entrypoint.s…"   8 days ago      Up 16 minutes   0.0.0.0:6379->6379/tcp, [::]:6379->6379/tcp                                                                                                                                                    scada_tag_engine
+52a8a861f7ad   timescale/timescaledb:latest-pg15   "docker-entrypoint.s…"   8 days ago      Up 16 minutes   0.0.0.0:5432->5432/tcp, [::]:5432->5432/tcp                                                                                                                                                    scada_historian
+9c0785ee2d66   emqx/emqx:5.3.0                     "/usr/bin/docker-ent…"   8 days ago      Up 16 minutes   4370/tcp, 0.0.0.0:1883->1883/tcp, [::]:1883->1883/tcp, 5369/tcp, 8084/tcp, 8883/tcp, 0.0.0.0:8083->8083/tcp, [::]:8083->8083/tcp, 0.0.0.0:18083->18083/tcp, [::]:18083->18083/tcp, 11883/tcp   scada_broker
