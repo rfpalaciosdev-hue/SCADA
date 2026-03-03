@@ -40,13 +40,13 @@ services:
   # Backend API
   backend:
     build:
-      context: .
-      dockerfile: Dockerfile.backend
+      context: ./backend
+      dockerfile: Dockerfile
     container_name: scada_backend
     ports:
       - "8000:8000"
     env_file:
-      - .env
+      - ./backend/.env
     environment:
       - REDIS_HOST=redis
       - DB_HOST=timescaledb
@@ -54,7 +54,7 @@ services:
       - redis
       - timescaledb
     volumes:
-      - .:/app
+      - ./backend:/app
     networks:
       - scada_net
 
@@ -76,8 +76,8 @@ services:
   # Historian Bridge (Worker)
   bridge:
     build:
-      context: .
-      dockerfile: Dockerfile.backend
+      context: ./backend
+      dockerfile: Dockerfile
     container_name: scada_bridge
     command: python historian_bridge.py
     environment:
@@ -89,15 +89,15 @@ services:
       - redis
       - timescaledb
     volumes:
-      - .:/app
+      - ./backend:/app
     networks:
       - scada_net
 
   # Watchdog - Monitoreo de Salud de Datos
   watchdog:
     build:
-      context: .
-      dockerfile: Dockerfile.backend
+      context: ./backend
+      dockerfile: Dockerfile
     container_name: scada_watchdog
     command: python watchdog_service.py
     environment:
