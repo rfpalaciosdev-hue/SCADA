@@ -73,38 +73,6 @@ class ChatRequest(BaseModel):
     message: str
     history: Optional[List[Dict]] = []
 
-@app.on_event("startup")
-async def startup_event():
-    """
-    Crea la tabla sensor_metadata si no existe al iniciar.
-    """
-    try:
-        conn = get_db_connection()
-        cur = conn.cursor()
-        cur.execute('''
-            CREATE TABLE IF NOT EXISTS sensor_metadata (
-                tag_id INTEGER PRIMARY KEY REFERENCES tag_definition(id) ON DELETE CASCADE,
-                description TEXT,
-                process_role TEXT,
-                normal_range_min DOUBLE PRECISION,
-                normal_range_max DOUBLE PRECISION,
-                critical_range_min DOUBLE PRECISION,
-                critical_range_max DOUBLE PRECISION,
-                physical_location TEXT,
-                related_system TEXT,
-                failure_impact TEXT,
-                operating_notes TEXT,
-                created_at TIMESTAMPTZ DEFAULT NOW(),
-                updated_at TIMESTAMPTZ DEFAULT NOW()
-            );
-        ''')
-        conn.commit()
-        cur.close()
-        conn.close()
-        print("✅ Base de datos verificada: tabla sensor_metadata lista.")
-    except Exception as e:
-        print(f"❌ Error creando tabla sensor_metadata: {e}")
-
 @app.post("/chat")
 def chat_endpoint(request: ChatRequest):
     try:

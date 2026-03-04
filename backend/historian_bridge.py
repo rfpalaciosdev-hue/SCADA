@@ -42,10 +42,11 @@ tag_cache = {}
 
 def setup_database():
     conn = get_db_connection()
-    if not conn: return
+    if not conn: 
+        return
     cur = conn.cursor()
     
-    # 1. Tabla de Definición de Tags (Con metadatos de jerarquía)
+    # 1. Tabla de Definición de Tags
     cur.execute("""
         CREATE TABLE IF NOT EXISTS tag_definition (
             id SERIAL PRIMARY KEY,
@@ -58,7 +59,7 @@ def setup_database():
         );
     """)
     
-    # 2. Tabla de Históricos (Optimizada con ID numérico)
+    # 2. Tabla de Históricos
     cur.execute("""
         CREATE TABLE IF NOT EXISTS historian (
             time TIMESTAMPTZ NOT NULL,
@@ -68,21 +69,21 @@ def setup_database():
         );
     """)
     
-    # 3. Tabla de Definición de Alarmas (Configuración con Operadores Manuales)
+    # 3. Tabla de Definición de Alarmas
     cur.execute("""
         CREATE TABLE IF NOT EXISTS alarm_definition (
             id SERIAL PRIMARY KEY,
             tag_id INTEGER REFERENCES tag_definition(id) ON DELETE CASCADE,
-            operator TEXT NOT NULL DEFAULT '>', -- '>', '<', '>=', '<=', '==', '!='
+            operator TEXT NOT NULL DEFAULT '>',
             threshold DOUBLE PRECISION NOT NULL,
-            priority TEXT DEFAULT 'MEDIUM', -- 'LOW', 'MEDIUM', 'HIGH', 'CRITICAL'
+            priority TEXT DEFAULT 'MEDIUM',
             enabled BOOLEAN DEFAULT TRUE,
             message TEXT,
             UNIQUE(tag_id, operator, threshold)
         );
     """)
 
-    # 4. Tabla de Alarmas Activas (Estado actual)
+    # 4. Tabla de Alarmas Activas
     cur.execute("""
         CREATE TABLE IF NOT EXISTS alarm_active (
             id SERIAL PRIMARY KEY,
@@ -115,18 +116,40 @@ def setup_database():
         );
     """)
 
-    # 6. Convertir a Hypertable e Índices
+    # 6. Metadata de Sensores (movida desde backend_api)
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS sensor_metadata (
+            tag_id INTEGER PRIMARY KEY REFERENCES tag_definition(id) ON DELETE CASCADE,
+            description TEXT,
+            process_role TEXT,
+            normal_range_min DOUBLE PRECISION,
+            normal_range_max DOUBLE PRECISION,
+            critical_range_min DOUBLE PRECISION,
+            critical_range_max DOUBLE PRECISION,
+            physical_location TEXT,
+            related_system TEXT,
+            failure_impact TEXT,
+            operating_notes TEXT,
+            created_at TIMESTAMPTZ DEFAULT NOW(),
+            updated_at TIMESTAMPTZ DEFAULT NOW()
+        );
+    """)
+
+    # 7. Convertir historian en hypertable e índice
     try:
         cur.execute("SELECT create_hypertable('historian', 'time', if_not_exists => TRUE);")
     except:
         pass
         
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_tag_time ON historian (tag_id, time DESC);")
+    cur.execute("""
+        CREATE INDEX IF NOT EXISTS idx_tag_time 
+        ON historian (tag_id, time DESC);
+    """)
         
     conn.commit()
     cur.close()
     conn.close()
-    print("✅ Base de Datos Industrial configurada (Tag Dictionary + Hypertables)")
+    print("✅ Base de Datos Industrial configurada completamente")
 
 def get_tag_id(tag_path, unit=None):
     # Si está en caché, lo devolvemos inmediatamente
