@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from routes import alarms, chat, history, sensors, tags, websocket
+from routes import alarms_router, chat_router, history_router, sensors_router, tags_router, websocket_routes
 
 app = FastAPI(title="SCADA Real-Time API")
 
@@ -15,12 +15,12 @@ app.add_middleware(
 )
 
 # ── Routers ────────────────────────────────────────────────────────────────────
-app.include_router(chat.router)
-app.include_router(sensors.router)
-app.include_router(history.router)
-app.include_router(alarms.router)
-app.include_router(tags.router)
-app.include_router(websocket.router)
+app.include_router(chat_router.router)
+app.include_router(sensors_router.router)
+app.include_router(history_router.router)
+app.include_router(alarms_router.router)
+app.include_router(tags_router.router)
+app.include_router(websocket_routes.router)
 
 
 @app.get("/")
